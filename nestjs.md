@@ -310,3 +310,286 @@ class D {
 }
 ```
 
+
+
+# 使用装饰器实现Get请求
+
+安装依赖npm install axios -S
+
+定义控制器 Controller
+
+```typescript
+class Controller {
+    constructor() {
+ 
+    }
+    getList () {
+ 
+    }
+}
+```
+
+定义装饰器
+
+这时候需要使用装饰器工厂
+
+应为装饰器默认会塞入一些参数
+
+定义 descriptor 的类型 通过 descriptor描述符里面的value 把axios的结果返回给当前使用装饰器的函数
+
+```typescript
+const Get = (url: string): MethodDecorator => {
+  return (target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
+    const fnc = descriptor.value
+    axios.get(url).then(res => {
+      fnc(res, {
+        status: 200
+      })
+    }).catch(e => {
+      fnc(e, {
+        status: 500
+      })
+    })
+  }
+}
+```
+
+```typescript
+import axios from 'axios'
+
+const Get = (url: string): MethodDecorator => {
+  return (target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) => {
+    const fnc = descriptor.value
+    axios.get(url).then(res => {
+      fnc(res, {
+        status: 200
+      })
+    }).catch(e => {
+      fnc(e, {
+        status: 500
+      })
+    })
+  }
+}
+
+class Controller {
+  constructor() {
+
+  }
+  @Get('https://api.apiopen.top/api/getHaoKanVideo?page=0&size=10')
+  getList(res: any, status: any) {
+    console.log(res.data.result, status);
+  }
+}
+```
+
+
+
+# nestjs-cli
+
+## 通过cli创建nestjs项目
+
+```css
+npm i -g @nestjs/cli
+nest new [项目名称]
+```
+
+启动项目 我们需要热更新就启动npm run start:dev就可以了
+
+```erlang
+"start": "nest start",
+"start:dev": "nest start --watch",
+"start:debug": "nest start --debug --watch",
+"start:prod": "node dist/main",
+```
+
+## 目录介绍
+
+main.ts 入口文件主文件 类似于vue 的main.ts，springboot的入口
+
+通过 NestFactory.create(AppModule) 创建一个app 就是类似于绑定一个根组件App.vue
+
+ app.listen(3000); 监听一个端口
+
+```typescript
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+Controller.ts 控制器
+
+等同于springboot的controller
+
+private readonly appService: AppService 这一行代码就是依赖注入不需要实例化 appService 它内部会自己实例化的我们主需要放上去就可以了
+
+```typescript
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.serv ice';
+
+@Controller('get')
+export class AppController {
+  constructor(private readonly appService: AppService) { }
+
+  @Get('hello')
+  getHello(): string {
+    return this.appService.getHello();
+  }
+}
+```
+
+app.service.ts
+
+这个文件主要实现业务逻辑的 当然Controller可以实现逻辑，但是就是单一的无法复用，放到app.service有别的模块也需要就可以实现复用，等同于springboot的service。
+
+```typescript
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AppService {
+  getHello(): string {
+    return 'CZZ';
+  }
+}
+```
+
+
+
+# nestjs cli 常用命令
+
+nest --help 可以查看nestjs所有的命令
+
+他的命令和angular很像
+
+![image-20221229112328135](https://markdown-czz.oss-cn-hangzhou.aliyuncs.com/img/image-20221229112328135.png)
+
+
+
+案例生成一个用户模块
+
+生成controller.ts
+
+```
+nest g co user
+```
+
+生成service.ts
+
+```
+nest g s user
+```
+
+以上步骤一个一个生成的太慢了我们可以直接使用一个命令生成CURD
+
+```
+nest g resource xiaoman
+```
+
+![image-20221229112618690](https://markdown-czz.oss-cn-hangzhou.aliyuncs.com/img/image-20221229112618690.png)
+
+生成成功后，可以在目录下看到user文件夹
+
+里面包含了service controller entity dto等一些标准的CRUD模板
+
+![image-20221229112954890](https://markdown-czz.oss-cn-hangzhou.aliyuncs.com/img/image-20221229112954890.png)
+
+在module.ts中可以看到已经自动帮我们将新的模块进行注入了。
+
+![image-20221229113015969](https://markdown-czz.oss-cn-hangzhou.aliyuncs.com/img/image-20221229113015969.png)
+
+![image-20221229113027548](https://markdown-czz.oss-cn-hangzhou.aliyuncs.com/img/image-20221229113027548.png)
+
+
+
+# 接口版本控制
+
+一共有三种我们一般用第一种 更加语义化
+
+| URI Versioning        | 版本将在请求的 URI 中传递（默认） |
+| --------------------- | --------------------------------- |
+| Header Versioning     | 自定义请求标头将指定版本          |
+| Media Type Versioning | 请求的`Accept`标头将指定版本      |
+
+首先在main.ts中声明
+
+```typescript
+import { VersioningType } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.enableVersioning{
+    type: VersioningType.URI
+  }
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+之后在user.controller中配置版本
+
+版本配置可以通过类装饰器或者方法装饰器来进行性配置
+
+```typescript
+import { Controller, Get, Post, Body, Patch, Param, Delete, Version } from '@nestjs/common';
+import { UserService } from './user.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Controller({
+  path: 'user',
+  version: '1'
+})
+export class UserController {
+  constructor(private readonly userService: UserService) { }
+
+  @Post()
+  create(@Body() createUserDto: CreateUserDto) {
+    return this.userService.create(createUserDto);
+  }
+
+  @Get()
+  @Version('2')
+  findAll() {
+    return this.userService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.userService.findOne(+id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.update(+id, updateUserDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.userService.remove(+id);
+  }
+}
+```
+
+
+
+# nestjs 控制器
+
+Controller Request （获取前端传过来的参数）
+nestjs 提供了方法参数装饰器 用来帮助我们快速获取参数 如下
+
+![image-20221229141839002](https://markdown-czz.oss-cn-hangzhou.aliyuncs.com/img/image-20221229141839002.png)
+
+## 获取get请求传参
+
+可以使用Request装饰器 或者 Query 装饰器 跟express 完全一样
+
+
+
+ 也可以使用Query 直接获取 不需要在通过req.query 了
